@@ -1,10 +1,14 @@
 package com.jesse.sample.networkchat;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Context;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
@@ -32,6 +36,51 @@ public class MainActivity extends AppCompatActivity {
     EditText password;
     private static final String TAG = "MainActivity";
 
+    private class MainActivityHandler extends Handler {
+        private Context context;
+        public void setContext(Context context){
+            this.context= context;
+        }
+
+        @Override
+        public void handleMessage(@NonNull Message msg) {
+            switch (msg.what){
+                case 1:
+                    runOnUiThread(new Runnable() {
+                        public void run() {
+                            Toast.makeText(context, "登陆成功", Toast.LENGTH_LONG).show();
+                        }
+                    });
+                    break;
+
+                case 2:
+                    runOnUiThread(new Runnable() {
+                        public void run() {
+                            Toast.makeText(context, "manager", Toast.LENGTH_LONG).show();
+                        }
+                    });
+                    break;
+                case 3:
+                    runOnUiThread(new Runnable() {
+                        public void run() {
+                            Toast.makeText(context, "登陆失败", Toast.LENGTH_LONG).show();
+                        }
+                    });
+                    break;
+                case 4:
+                    runOnUiThread(new Runnable() {
+                        public void run() {
+                            Toast.makeText(context, "用户名密码为空", Toast.LENGTH_LONG).show();
+                        }
+                    });
+                    break;
+            }
+        }
+    }
+
+    private MainActivityHandler handler = new MainActivityHandler();
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -39,6 +88,7 @@ public class MainActivity extends AppCompatActivity {
         PermissionHelper.checkPermission(this, Manifest.permission.RECORD_AUDIO);
         username = findViewById(R.id.username);
         password = findViewById(R.id.password);
+        handler.setContext(this);
     }
 
     public void login(View view) throws JSONException {
@@ -55,22 +105,45 @@ public class MainActivity extends AppCompatActivity {
                     .url("http://10.5.34.92:3000/login")
                     .post(requestBody)
                     .build();
-            final Activity context = this;
+            final MainActivity context = this;
             client.newCall(request).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
-                    Toast.makeText(context, "登陆失败", Toast.LENGTH_LONG).show();
+                    Message message = new Message();
+                    message.what = 3;
+                    handler.dispatchMessage(message);
                 }
 
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
-                    Log.i(TAG, "onResponse: "+response.body().string());
+                    String responseContent = response.body().string();
+                    if ("failed".equals(responseContent)) {
+                        Message message = new Message();
+                        message.what = 3;
+                        handler.dispatchMessage(message);
+                    } else if ("manager".equals(responseContent)) {
+                        //manager page
+                        Message message = new Message();
+                        message.what = 2;
+                        handler.dispatchMessage(message);
+                    } else {
+                        //normal page
+                        Message message = new Message();
+                        message.what = 1;
+                        handler.dispatchMessage(message);
+                    }
                 }
             });
 
         } else {
-            Toast.makeText(this, "用户名密码为空", Toast.LENGTH_LONG).show();
+            Message message = new Message();
+            message.what = 4;
+            handler.dispatchMessage(message);
         }
 
+    }
+
+    private void toastMessage(String massage) {
+        Toast.makeText(this, massage, Toast.LENGTH_LONG).show();
     }
 }
